@@ -104,12 +104,10 @@ def printverbose(text):
         print(text)
 def progressBar(state, total=10, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
     # Progress Bar Printing Function
-    def printProgressBar (iteration):
-        percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-        filledLength = int(length * iteration // total)
-        bar = fill * filledLength + '-' * (length - filledLength)
-        print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
-    printProgressBar(state)
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (state / float(total)))
+    filledLength = int(length * state // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
 def join_files_to_big_file(src_dir,out_file,format,max_size):
     printverbose("Start Joining")
     global aborted
