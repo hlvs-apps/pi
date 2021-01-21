@@ -10,11 +10,46 @@ import glob
 import argparse
 import math
 import textwrap
-
+import sys
+from pathlib import Path
 
 verbose=False
+overide=False
+aborted=False
+def query_yes_no(question, default=None):
+    """Ask a yes/no question via raw_input() and return their answer.
+
+    "question" is a string that is presented to the user.
+    "default" is the presumed answer if the user just hits <Enter>.
+        It must be "yes" (the default), "no" or None (meaning
+        an answer is required of the user).
+
+    The "answer" return value is True for "yes" or False for "no".
+    """
+    valid = {"yes": True, "y": True, "ye": True,
+             "no": False, "n": False}
+    if default is None:
+        prompt = " [y/n] "
+    elif default == "yes":
+        prompt = " [Y/n] "
+    elif default == "no":
+        prompt = " [y/N] "
+    else:
+        raise ValueError("invalid default answer: '%s'" % default)
+
+    while True:
+        sys.stdout.write(question + prompt)
+        choice = input().lower()
+        if default is not None and choice == '':
+            return valid[default]
+        elif choice in valid:
+            return valid[choice]
+        else:
+            sys.stdout.write("Please respond with 'yes' or 'no' "
+                             "(or 'y' or 'n').\n")
 
 def split(src,out_dir,bytes_per_file,format,chars_per_step):
+    global aborted
     printverbose('Starting Split Mode')
     string_for_out=''
     n_now=0
@@ -34,9 +69,31 @@ def split(src,out_dir,bytes_per_file,format,chars_per_step):
     printverbose('File Size: '+str(f_size))
     aprox_files=math.ceil(f_size/bytes_per_file)
     printverbose('That means approx. '+str(aprox_files)+ ' Files.')
-    diggits=math.ceil(len(str(aprox_files)))
+    diggits=math.ceil(len(str(aprox_files-1)))
     printverbose('That means we need '+str(diggits)+' Diggits.')
     file = open(src, 'r')
+    question_is_trogerd=False
+    i=0
+    while i < aprox_files:
+        printverbose(str(i))
+        printverbose("Checking: "+str(os.path.join(out_dir, str(i).zfill(diggits)+ '.' + format)))
+        if Path(os.path.join(out_dir, str(i).zfill(diggits)+ '.' + format)).is_file():
+            printverbose("Exists")
+            if(overide==True):
+                os.remove((str(os.path.join(out_dir, str(i).zfill(diggits)+ '.' + format))))
+            else:
+                if(query_yes_no("File {} does exist. Do you want to overide it?".format(str(os.path.join(out_dir, str(i).zfill(diggits)))))):
+                    os.remove((str(os.path.join(out_dir, str(i).zfill(diggits)+ '.' + format))))
+                    question_is_trogerd=True
+                else:
+                    print("Aborting.")
+                    aborted=True
+                    print("Note: you can also run {} -o to skip this questions.".format(os.path.basename(__file__)))
+                    return
+        i+=1
+    if question_is_trogerd:
+        print("Note: you can also run {} -o to skip this questions.".format(os.path.basename(__file__)))
+    printverbose("Let's start")
     progressBar(0, prefix = 'Progress:', suffix = 'Complete', length = 50,total=aprox_files)
     try:
         while 1:
@@ -74,12 +131,27 @@ def progressBar(state, total=10, prefix = '', suffix = '', decimals = 1, length 
     printProgressBar(state)
 def join_files_to_big_file(src_dir,out_file,format,max_size):
     printverbose("Start Joining")
+    global aborted
+    if Path(out_file).is_file():
+            printverbose("Exists")
+            if(overide==True):
+                os.remove(out_file)
+            else:
+                if(query_yes_no("File {} does exist. Do you want to overide it?".format(out_file))):
+                    os.remove(out_file)
+                    print("Note: you can also run {} -o to skip this questions.".format(os.path.basename(__file__)))
+                else:
+                    print("Aborting.")
+                    aborted=True
+                    print("Note: you can also run {} -o to skip this questions.".format(os.path.basename(__file__)))
+                    return
+
     if(os.path.isdir(src_dir)):
         printverbose(src_dir+' is a Directory')
     else:
         print(src_dir+' is not a Directory. Aborting.')
         return
-    progressBar(file_number_now, prefix = 'Progress:', suffix = 'Complete', length = 50,total=aprox_files)
+    progressBar(0, prefix = 'Progress:', suffix = 'Complete', length = 50,total=100)
     with open(out_file,'w') as f:
         list= glob.glob(os.path.join(src_dir, '*.' + format))
         lenall=len(list)
@@ -101,6 +173,11 @@ def main(src,out,join,format,size,max_size):
         join_files_to_big_file(src,out,format,max_size)
     else:
         split(src,out,size,format,math.ceil(size/100))
+    if(aborted==False):
+        progressBar(100, prefix = 'Progress:', suffix = 'Complete', length = 50,total=100)#Show 100%
+        print("")
+        print("")
+        print("Done.")
 if __name__ == '__main__':
     nameofscrip=os.path.basename(__file__)
     parser = argparse.ArgumentParser(prog=nameofscrip,
@@ -119,9 +196,11 @@ WARNING: This Code only works with Files with one Character per Byte.
     parser.add_argument('-f','--format', dest='format', help='File Format for In and Output files. Example Usage: "-f txt" for .txt files. txt is default format',default='txt', type=str)
     parser.add_argument('--max-size', dest='maxsize', help='File Output Size for mode Join Mode in Bytes, Default is -1 (Original Size)',type=int, default=-1)
     parser.add_argument('-v','--verbose', dest='verbose', help='Show Verbose Information', action='store_true')
+    parser.add_argument('-o','--overide', dest='overide', help='Overide existing files. When set, you will not be asked if you want to overide the files', action='store_true')
     parser.set_defaults(verbose=False)
     args = parser.parse_args()
     verbose=args.verbose
+    overide=args.overide
     printverbose("Verbose Information is enabled")
     printverbose("Mode: "+str(args.mode))
     printverbose("Source: "+args.src)
@@ -129,6 +208,7 @@ WARNING: This Code only works with Files with one Character per Byte.
     printverbose("Output: "+args.out)
     printverbose("Format: "+args.format)
     printverbose("Max Size: "+str(args.maxsize))
+    printverbose("Overide: "+str(args.overide))
     if args.mode=='j':
         main(args.src,args.out,True,args.format,args.filesize,args.maxsize)
     elif args.mode=='s':
